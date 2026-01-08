@@ -1,0 +1,10 @@
+{
+    "expo": {
+        "name": "link-mobile-app",
+        "slug": "link-mobile-app",
+        "version": "1.0.0",
+        "assetBundlePatterns": [
+            "**/*"
+        ]
+    }
+}
