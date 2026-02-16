@@ -1,40 +1,53 @@
 import React from "react";
-import { SafeAreaView, View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
+import Screen from "../components/ui/Screen";
+import Card from "../components/ui/Card";
+import { colors, spacing, typography } from "../theme/tokens";
 
 const SymptomCheckerScreen = () => {
   return (
-    <SafeAreaView style={styles.container} testID="symptom-checker-screen">
-      <View style={styles.content}>
+    <Screen>
+      <View style={styles.header}>
         <Text style={styles.title}>Symptom Checker</Text>
         <Text style={styles.subtitle}>
-          Describe your symptoms to get guided next steps.
+          Guidance tailored to your clinic network.
         </Text>
       </View>
-    </SafeAreaView>
+
+      <Card>
+        <Text style={styles.cardLabel}>Coming soon</Text>
+        <Text style={styles.cardBody}>
+          We’re preparing an AI-assisted triage flow with safe, clear medical
+          guidance tailored to your clinic network.
+        </Text>
+      </Card>
+    </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f1f5f9",
-  },
-  content: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
+  header: {
+    marginBottom: spacing.md,
   },
   title: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "700",
-    color: "#0f172a",
-    marginBottom: 10,
+    color: colors.ink,
+    marginBottom: 4,
   },
   subtitle: {
-    fontSize: 14,
-    color: "#475569",
-    textAlign: "center",
+    fontSize: 13,
+    color: colors.muted,
+  },
+  cardLabel: {
+    ...typography.caption,
+    textTransform: "uppercase",
+    letterSpacing: 1.1,
+    color: colors.primary,
+    marginBottom: spacing.sm,
+  },
+  cardBody: {
+    ...typography.body,
   },
 });
 

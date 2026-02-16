@@ -1,40 +1,60 @@
 import React from "react";
-import { SafeAreaView, View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
+import Screen from "../components/ui/Screen";
+import Card from "../components/ui/Card";
+import Button from "../components/ui/Button";
+import { colors, spacing, typography } from "../theme/tokens";
 
 const FacilityFinderScreen = () => {
   return (
-    <SafeAreaView style={styles.container} testID="facility-finder-screen">
-      <View style={styles.content}>
+    <Screen>
+      <View style={styles.header}>
         <Text style={styles.title}>Find Facilities</Text>
         <Text style={styles.subtitle}>
-          Discover clinics and hospitals near you.
+          Explore clinics and hospitals around you.
         </Text>
       </View>
-    </SafeAreaView>
+
+      <Card style={styles.card}>
+        <Text style={styles.cardTitle}>Nearby highlights</Text>
+        <Text style={styles.cardBody}>
+          Enable location sharing to see facilities, hours, and services around
+          you.
+        </Text>
+        <View style={styles.cardActions}>
+          <Button title="Enable location" onPress={() => { }} />
+        </View>
+      </Card>
+    </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#eef2ff",
-  },
-  content: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
+  header: {
+    marginBottom: spacing.md,
   },
   title: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "700",
-    color: "#1e1b4b",
-    marginBottom: 10,
+    color: colors.ink,
+    marginBottom: 4,
   },
   subtitle: {
-    fontSize: 14,
-    color: "#4338ca",
-    textAlign: "center",
+    fontSize: 13,
+    color: colors.muted,
+  },
+  card: {
+    gap: spacing.sm,
+  },
+  cardTitle: {
+    ...typography.h3,
+  },
+  cardBody: {
+    ...typography.body,
+    color: colors.text,
+  },
+  cardActions: {
+    marginTop: spacing.sm,
   },
 });
 
