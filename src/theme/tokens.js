@@ -46,3 +46,12 @@ export const shadow = {
     elevation: 4,
   },
 };
+
+// Convenience aggregate — HEW screens import `{ tokens }`
+export const tokens = {
+  colors,
+  typography,
+  spacing,
+  radii: radius,
+  shadow,
+};

@@ -47,8 +47,15 @@ const request = async (path, { method = "GET", body, headers, auth = true } = {}
 
     if (!response.ok) {
       const payload = await response.json().catch(() => ({}));
-      const message = payload.error || `Request failed (${response.status})`;
-      throw new Error(message);
+      const message =
+        payload?.message ||
+        payload?.error ||
+        `Request failed (${response.status})`;
+      const requestError = new Error(message);
+      requestError.status = response.status;
+      requestError.code = payload?.code || null;
+      requestError.payload = payload;
+      throw requestError;
     }
 
     if (response.status === 204) return null;

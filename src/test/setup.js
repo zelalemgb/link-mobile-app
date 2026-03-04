@@ -3,10 +3,58 @@ process.env.EXPO_PUBLIC_SUPABASE_URL =
 process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY =
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "test-anon-key";
 
+jest.mock(
+  "@react-native-async-storage/async-storage",
+  () =>
+    require("@react-native-async-storage/async-storage/jest/async-storage-mock")
+);
+
+jest.mock("expo-av", () => ({
+  Audio: {
+    requestPermissionsAsync: jest.fn(() => Promise.resolve({ granted: true })),
+    setAudioModeAsync: jest.fn(() => Promise.resolve()),
+    Recording: {
+      createAsync: jest.fn(() =>
+        Promise.resolve({
+          recording: {
+            stopAndUnloadAsync: jest.fn(() => Promise.resolve()),
+            getURI: jest.fn(() => "file://mock-recording.m4a"),
+          },
+        })
+      ),
+    },
+    RecordingOptionsPresets: {
+      HIGH_QUALITY: {},
+    },
+  },
+}));
+
 jest.mock("expo-secure-store", () => ({
   getItemAsync: jest.fn(() => Promise.resolve(null)),
   setItemAsync: jest.fn(() => Promise.resolve()),
   deleteItemAsync: jest.fn(() => Promise.resolve()),
+}));
+
+jest.mock("expo-task-manager", () => ({
+  isTaskDefined: jest.fn(() => false),
+  defineTask: jest.fn(),
+  isTaskRegisteredAsync: jest.fn(() => Promise.resolve(false)),
+}));
+
+jest.mock("expo-background-fetch", () => ({
+  BackgroundFetchStatus: {
+    Restricted: 1,
+    Denied: 2,
+    Available: 3,
+  },
+  BackgroundFetchResult: {
+    NoData: 1,
+    NewData: 2,
+    Failed: 3,
+  },
+  getStatusAsync: jest.fn(() => Promise.resolve(3)),
+  registerTaskAsync: jest.fn(() => Promise.resolve()),
+  unregisterTaskAsync: jest.fn(() => Promise.resolve()),
 }));
 
 jest.mock("react-native-safe-area-context", () => {
