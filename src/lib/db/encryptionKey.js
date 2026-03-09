@@ -14,8 +14,13 @@
  *   • Key rotation: call rotateEncryptionKey() after PRAGMA rekey in the DB layer
  */
 
-import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
+
+// expo-secure-store uses a native module that crashes on web at import time.
+let SecureStore = null;
+if (Platform.OS !== 'web') {
+  SecureStore = require('expo-secure-store');
+}
 
 const DB_KEY_STORE_KEY = 'link_db_enc_key_v1';
 

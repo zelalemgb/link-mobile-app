@@ -7,6 +7,9 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { trackEvent } from "./lib/telemetry";
 import LoginScreen from "./screens/LoginScreen";
 import SymptomCheckerConversationalScreen from "./screens/SymptomCheckerConversationalScreen";
+import PatientAppointmentsScreen from "./screens/PatientAppointmentsScreen";
+import PatientConsentScreen from "./screens/PatientConsentScreen";
+import PatientHealthRecordsScreen from "./screens/PatientHealthRecordsScreen";
 
 import MainTabs from "./navigation/MainTabs";
 import HEWNavigator from "./navigation/HEWNavigator";
@@ -139,6 +142,21 @@ const AppNavigator = () => {
           name="SymptomCheckerConversational"
           component={SymptomCheckerConversationalScreen}
           options={{ title: "ምልክት መለያ" }}
+        />
+        <Stack.Screen
+          name="PatientAppointments"
+          component={PatientAppointmentsScreen}
+          options={{ title: "Appointments" }}
+        />
+        <Stack.Screen
+          name="PatientConsent"
+          component={PatientConsentScreen}
+          options={{ title: "Consent Center" }}
+        />
+        <Stack.Screen
+          name="PatientHealthRecords"
+          component={PatientHealthRecordsScreen}
+          options={{ title: "Health Records" }}
         />
       </Stack.Navigator>
     </NavigationContainer>

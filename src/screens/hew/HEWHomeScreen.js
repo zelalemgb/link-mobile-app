@@ -19,7 +19,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
-import { searchPatients, getCaseload, getPatientNotes } from '../../services/hewService';
+import { searchPatients, getCaseload, getPatientNotes, getFacilityPatients } from '../../services/hewService';
 import { tokens } from '../../theme/tokens';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -144,22 +144,44 @@ export default function HEWHomeScreen({ navigation }) {
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebounce(query);
 
+  const [facilityPatients, setFacilityPatients] = useState([]);
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
+  const [loadingFacility, setLoadingFacility] = useState(true);
 
   const [caseload, setCaseload] = useState([]);
   const [loadingCaseload, setLoadingCaseload] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Search
+  // Load all facility patients on mount
+  useEffect(() => {
+    setLoadingFacility(true);
+    getFacilityPatients()
+      .then(setFacilityPatients)
+      .catch(() => setFacilityPatients([]))
+      .finally(() => setLoadingFacility(false));
+  }, []);
+
+  // Search — filter facility patients locally, or hit API for broader search
   useEffect(() => {
     if (debouncedQuery.length < 2) { setSearchResults([]); return; }
     setSearching(true);
-    searchPatients(debouncedQuery)
-      .then(setSearchResults)
-      .catch(() => setSearchResults([]))
-      .finally(() => setSearching(false));
-  }, [debouncedQuery]);
+    // First try local filter on facility patients
+    const q = debouncedQuery.toLowerCase();
+    const localMatches = facilityPatients.filter(
+      (p) => p.full_name?.toLowerCase().includes(q) || p.phone?.includes(debouncedQuery)
+    );
+    if (localMatches.length > 0) {
+      setSearchResults(localMatches);
+      setSearching(false);
+    } else {
+      // Fall back to API search
+      searchPatients(debouncedQuery)
+        .then(setSearchResults)
+        .catch(() => setSearchResults([]))
+        .finally(() => setSearching(false));
+    }
+  }, [debouncedQuery, facilityPatients]);
 
   // Caseload — reload on tab focus
   const loadCaseload = useCallback(async (isRefresh = false) => {
@@ -220,10 +242,16 @@ export default function HEWHomeScreen({ navigation }) {
             )}
           </View>
 
-          {debouncedQuery.length < 2 && (
+          {loadingFacility && debouncedQuery.length < 2 && (
             <View style={styles.emptyState}>
-              <Feather name="search" size={40} color="#e2e8f0" />
-              <Text style={styles.emptyText}>Search for a patient to log a household visit.</Text>
+              <ActivityIndicator size="large" color={tokens.colors.primary} />
+            </View>
+          )}
+
+          {!loadingFacility && debouncedQuery.length < 2 && facilityPatients.length === 0 && (
+            <View style={styles.emptyState}>
+              <Feather name="users" size={40} color="#e2e8f0" />
+              <Text style={styles.emptyText}>No patients registered at your facility.</Text>
             </View>
           )}
 
@@ -231,14 +259,32 @@ export default function HEWHomeScreen({ navigation }) {
             <Text style={styles.noResults}>No patients found for "{debouncedQuery}"</Text>
           )}
 
-          <FlatList
-            data={searchResults}
-            keyExtractor={(p) => p.id}
-            contentContainerStyle={styles.listContent}
-            renderItem={({ item }) => (
-              <PatientCard patient={item} onLogVisit={goLog} />
-            )}
-          />
+          {debouncedQuery.length < 2 && !loadingFacility && facilityPatients.length > 0 && (
+            <>
+              <Text style={styles.sectionHeader}>
+                Zelalem Hospital — {facilityPatients.length} patients
+              </Text>
+              <FlatList
+                data={facilityPatients}
+                keyExtractor={(p) => p.id}
+                contentContainerStyle={styles.listContent}
+                renderItem={({ item }) => (
+                  <PatientCard patient={item} onLogVisit={goLog} />
+                )}
+              />
+            </>
+          )}
+
+          {debouncedQuery.length >= 2 && (
+            <FlatList
+              data={searchResults}
+              keyExtractor={(p) => p.id}
+              contentContainerStyle={styles.listContent}
+              renderItem={({ item }) => (
+                <PatientCard patient={item} onLogVisit={goLog} />
+              )}
+            />
+          )}
         </View>
       )}
 
@@ -294,6 +340,7 @@ const styles = StyleSheet.create({
   emptyState:      { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 48, gap: 10 },
   emptyText:       { fontSize: 14, color: tokens.colors.muted, textAlign: 'center', paddingHorizontal: 32 },
   noResults:       { textAlign: 'center', color: tokens.colors.muted, fontSize: 14, marginTop: 24 },
+  sectionHeader:   { fontSize: 13, fontWeight: '600', color: tokens.colors.muted, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 4 },
 
   // List
   listContent:     { padding: 14, gap: 12 },

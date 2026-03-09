@@ -26,6 +26,16 @@ export async function searchPatients(query) {
   return res?.patients ?? [];
 }
 
+/**
+ * Fetch all patients registered at the HEW's facility.
+ * Used to show the full patient list when no search query is active.
+ * @returns {Promise<Array>}
+ */
+export async function getFacilityPatients() {
+  const res = await api.get('/hew/facility-patients');
+  return res?.patients ?? [];
+}
+
 // ─── Community notes ────────────────────────────────────────────────────────
 
 /**

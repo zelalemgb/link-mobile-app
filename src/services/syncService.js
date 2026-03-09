@@ -25,6 +25,18 @@ const DEFAULT_PULL_LIMIT = 200;
 const DEFAULT_PULL_MAX_PAGES = 5;
 const DEFAULT_CONFLICT_AUDIT_LIMIT = 100;
 
+const BACKOFF_BASE_MS = 1000;       // 1 second
+const BACKOFF_MAX_MS = 5 * 60 * 1000; // 5 minutes max
+const BACKOFF_JITTER_FACTOR = 0.3;   // ±30% jitter
+
+const calculateBackoff = (attempt) => {
+  const exponential = Math.min(BACKOFF_BASE_MS * Math.pow(2, attempt), BACKOFF_MAX_MS);
+  const jitter = exponential * BACKOFF_JITTER_FACTOR * (Math.random() * 2 - 1);
+  return Math.max(0, Math.round(exponential + jitter));
+};
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 let inFlightSync = null;
 
 const toScope = (candidate) => {
@@ -237,6 +249,12 @@ const pushOneBatch = async ({
     const message = String(error?.message || 'push failed');
     const reason = code ? `${code}: ${message}` : message;
     await markBatchFailed(rows, reason);
+    // Exponential backoff before next retry
+    const maxAttempt = Math.max(...rows.map(r => r.attempts || 0));
+    const backoffMs = calculateBackoff(maxAttempt);
+    if (backoffMs > 0) {
+      await sleep(backoffMs);
+    }
     return { pushed: 0, conflicts: 0, failed: rows.length, done: false };
   }
 };
@@ -366,7 +384,21 @@ export const pullSyncDeltas = async ({
     });
     if (cursor) query.set('cursor', cursor);
 
-    const response = await api.get(`/sync/pull?${query.toString()}`);
+    let response;
+    let pullAttempt = 0;
+    const maxPullRetries = 3;
+    while (pullAttempt < maxPullRetries) {
+      try {
+        response = await api.get(`/sync/pull?${query.toString()}`);
+        break; // Success, exit retry loop
+      } catch (err) {
+        pullAttempt += 1;
+        if (pullAttempt >= maxPullRetries) throw err;
+        const backoffMs = calculateBackoff(pullAttempt);
+        await sleep(backoffMs);
+      }
+    }
+
     const ops = Array.isArray(response?.ops) ? response.ops : [];
     const tombstones = Array.isArray(response?.tombstones) ? response.tombstones : [];
 

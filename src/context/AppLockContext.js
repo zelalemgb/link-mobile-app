@@ -26,8 +26,24 @@ import React, {
   useCallback,
 } from 'react';
 import { AppState, Platform } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
-import * as LocalAuthentication from 'expo-local-authentication';
+
+// Native-only modules — lazy-load to avoid web crash
+let SecureStore = null;
+let LocalAuthentication = null;
+if (Platform.OS !== 'web') {
+  SecureStore = require('expo-secure-store');
+  LocalAuthentication = require('expo-local-authentication');
+}
+
+// Web stubs for SecureStore
+const WebStore = {
+  _data: {},
+  getItemAsync: async (key) => WebStore._data[key] ?? null,
+  setItemAsync: async (key, value) => { WebStore._data[key] = value; },
+  deleteItemAsync: async (key) => { delete WebStore._data[key]; },
+  WHEN_UNLOCKED_THIS_DEVICE_ONLY: 0,
+};
+const SS = Platform.OS === 'web' ? WebStore : SecureStore;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -41,9 +57,11 @@ const AppLockContext = createContext(null);
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function AppLockProvider({ children }) {
-  const [loading, setLoading]                     = useState(true);
+  const isWeb = Platform.OS === 'web';
+  // On web, skip PIN/lock entirely — not needed for browser-based dev/testing
+  const [loading, setLoading]                     = useState(!isWeb);
   const [isLocked, setIsLocked]                   = useState(false);
-  const [hasPinSet, setHasPinSet]                 = useState(false);
+  const [hasPinSet, setHasPinSet]                 = useState(isWeb); // true on web → skip PIN setup
   const [biometricsAvailable, setBiometricsAvailable] = useState(false);
   const [failedAttempts, setFailedAttempts]        = useState(0);
 
@@ -52,10 +70,11 @@ export function AppLockProvider({ children }) {
 
   // ── Initialise on mount ───────────────────────────────────────────────────
   useEffect(() => {
+    if (isWeb) return; // Web skips PIN/lock — already initialised above
     (async () => {
       try {
         // Check PIN existence
-        const storedPin = await SecureStore.getItemAsync(PIN_STORE_KEY);
+        const storedPin = await SS.getItemAsync(PIN_STORE_KEY);
         const pinExists = Boolean(storedPin);
         setHasPinSet(pinExists);
 
@@ -112,9 +131,9 @@ export function AppLockProvider({ children }) {
    * Unlocks the app after setup.
    */
   const setPin = useCallback(async (pin) => {
-    await SecureStore.setItemAsync(PIN_STORE_KEY, pin, {
+    await SS.setItemAsync(PIN_STORE_KEY, pin, {
       requireAuthentication: false,
-      keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+      keychainAccessible: SS.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
     });
     setHasPinSet(true);
     setIsLocked(false);
@@ -129,7 +148,7 @@ export function AppLockProvider({ children }) {
    */
   const unlock = useCallback(async (enteredPin) => {
     try {
-      const stored = await SecureStore.getItemAsync(PIN_STORE_KEY);
+      const stored = await SS.getItemAsync(PIN_STORE_KEY);
       if (stored === enteredPin) {
         setIsLocked(false);
         setFailedAttempts(0);
@@ -183,7 +202,7 @@ export function AppLockProvider({ children }) {
    * Used for "Remove app lock" in settings (requires re-authentication first).
    */
   const clearPin = useCallback(async () => {
-    await SecureStore.deleteItemAsync(PIN_STORE_KEY);
+    await SS.deleteItemAsync(PIN_STORE_KEY);
     setHasPinSet(false);
     setIsLocked(false);
     setFailedAttempts(0);

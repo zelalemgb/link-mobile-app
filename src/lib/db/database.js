@@ -18,8 +18,15 @@
  *   transaction.  Add new entries to MIGRATIONS[] as the schema evolves.
  */
 
-import * as SQLite from 'expo-sqlite';
 import { Platform } from 'react-native';
+
+// expo-sqlite uses a native module that crashes on web at import time.
+// Lazy-import it only on native platforms.
+let SQLite = null;
+if (Platform.OS !== 'web') {
+  SQLite = require('expo-sqlite');
+}
+
 import { getOrCreateDbKey } from './encryptionKey';
 import {
   ALL_DDL,
@@ -92,14 +99,28 @@ export const initDatabase = async (userId) => {
     return _db;
   }
 
+  const isWeb = Platform.OS === 'web';
+
+  // On web, SQLite is not available — provide a no-op stub so the app renders.
+  if (isWeb) {
+    console.log('[DB] Web platform detected — using in-memory stub (no SQLite)');
+    _db = {
+      execAsync: async () => {},
+      getFirstAsync: async () => null,
+      getAllAsync: async () => [],
+      runAsync: async () => ({ changes: 0 }),
+      withTransactionAsync: async (fn) => fn(),
+      closeAsync: async () => {},
+    };
+    return _db;
+  }
+
   const dbName = 'link_clinician.db';
 
   try {
-    // On web (dev only) we skip encryption — SQLCipher is native-only
-    const isWeb = Platform.OS === 'web';
-    const passphrase = isWeb ? undefined : await getOrCreateDbKey();
+    const passphrase = await getOrCreateDbKey();
 
-    console.log(`[DB] Opening database "${dbName}" (encrypted: ${!isWeb})`);
+    console.log(`[DB] Opening database "${dbName}" (encrypted: true)`);
 
     const db = await SQLite.openDatabaseAsync(dbName, {
       ...(passphrase ? { passphrase } : {}),

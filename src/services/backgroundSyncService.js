@@ -1,12 +1,18 @@
 import { Platform } from 'react-native';
-import * as TaskManager from 'expo-task-manager';
-import * as BackgroundFetch from 'expo-background-fetch';
 import { runSyncNow } from './syncService';
+
+// Native-only modules — skip on web to avoid crash
+let TaskManager = null;
+let BackgroundFetch = null;
+if (Platform.OS !== 'web') {
+  TaskManager = require('expo-task-manager');
+  BackgroundFetch = require('expo-background-fetch');
+}
 
 export const WAVE2_BACKGROUND_SYNC_TASK = 'link-wave2-background-sync';
 const MIN_INTERVAL_SECONDS = 15 * 60;
 
-if (!TaskManager.isTaskDefined(WAVE2_BACKGROUND_SYNC_TASK)) {
+if (TaskManager && !TaskManager.isTaskDefined(WAVE2_BACKGROUND_SYNC_TASK)) {
   TaskManager.defineTask(WAVE2_BACKGROUND_SYNC_TASK, async () => {
     try {
       console.log('[sync-bg] task-start');
@@ -34,10 +40,10 @@ if (!TaskManager.isTaskDefined(WAVE2_BACKGROUND_SYNC_TASK)) {
   });
 }
 
-const isAndroid = () => Platform.OS === 'android';
+const isNative = () => Platform.OS === 'android' || Platform.OS === 'ios';
 
 export const registerBackgroundSyncAsync = async () => {
-  if (!isAndroid()) return { ok: false, reason: 'UNSUPPORTED_PLATFORM' };
+  if (!isNative() || !BackgroundFetch || !TaskManager) return { ok: false, reason: 'UNSUPPORTED_PLATFORM' };
 
   const status = await BackgroundFetch.getStatusAsync();
   console.log(`[sync-bg] register-status=${status}`);
@@ -66,7 +72,7 @@ export const registerBackgroundSyncAsync = async () => {
 };
 
 export const unregisterBackgroundSyncAsync = async () => {
-  if (!isAndroid()) return;
+  if (!isNative() || !BackgroundFetch || !TaskManager) return;
   const registered = await TaskManager.isTaskRegisteredAsync(
     WAVE2_BACKGROUND_SYNC_TASK
   );
@@ -77,7 +83,7 @@ export const unregisterBackgroundSyncAsync = async () => {
 };
 
 export const getBackgroundSyncRegistrationAsync = async () => {
-  if (!isAndroid()) {
+  if (!isNative() || !TaskManager) {
     return { platform: Platform.OS, registered: false };
   }
   const registered = await TaskManager.isTaskRegisteredAsync(

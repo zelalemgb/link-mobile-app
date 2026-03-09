@@ -1,5 +1,10 @@
-import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
+
+// expo-secure-store uses a native module that crashes on web at import time.
+let SecureStore = null;
+if (Platform.OS !== "web") {
+  SecureStore = require("expo-secure-store");
+}
 
 const TOKEN_KEY = "linkhc_auth_token";
 

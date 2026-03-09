@@ -8,7 +8,9 @@ import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
 
 const ProfileScreen = () => {
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
+  const displayName = user?.full_name || "Patient";
+  const facility = user?.facility_name || "Addis Ababa";
 
   return (
     <Screen>
@@ -21,7 +23,7 @@ const ProfileScreen = () => {
 
       <Card style={styles.card}>
         <Text style={styles.cardTitle}>Primary details</Text>
-        <Text style={styles.cardBody}>Zelalem Giz · Addis Ababa</Text>
+        <Text style={styles.cardBody}>{displayName} · {facility}</Text>
         <Button title="Update profile" onPress={() => { }} variant="secondary" />
         <Button
           title="Sign out"

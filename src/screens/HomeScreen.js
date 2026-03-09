@@ -204,6 +204,37 @@ const HomeScreen = () => {
               </View>
             </View>
           </View>
+
+          <View style={styles.sectionRow}>
+            <Text style={styles.sectionTitle}>Services</Text>
+          </View>
+
+          <View style={styles.servicesRow}>
+            <Pressable
+              style={[styles.serviceCard, styles.lightPurpleCard]}
+              onPress={() => navigation.navigate("PatientAppointments")}
+            >
+              <Text style={styles.cardTitle}>Appointments</Text>
+              <Text style={styles.cardBody}>Book &amp; manage visits.</Text>
+              <Text style={styles.cardMeta}>Book now</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.serviceCard, styles.greenCard]}
+              onPress={() => navigation.navigate("PatientConsent")}
+            >
+              <Text style={styles.cardTitle}>Consent</Text>
+              <Text style={styles.cardBody}>Manage data sharing.</Text>
+              <Text style={styles.cardMeta}>Manage</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.serviceCard, { backgroundColor: palette.softWhite, borderWidth: 1, borderColor: palette.lightPurple }]}
+              onPress={() => navigation.navigate("PatientHealthRecords")}
+            >
+              <Text style={styles.cardTitle}>Records</Text>
+              <Text style={styles.cardBody}>Your health docs.</Text>
+              <Text style={styles.cardMeta}>View</Text>
+            </Pressable>
+          </View>
         </View>
       </ScrollView>
 
@@ -396,6 +427,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     color: palette.darkPurple,
+  },
+  servicesRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  serviceCard: {
+    flex: 1,
+    borderRadius: 18,
+    padding: spacing.md,
+    minHeight: 100,
+    justifyContent: "space-between",
   },
   cardGrid: {
     flexDirection: "row",

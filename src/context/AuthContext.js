@@ -1,6 +1,22 @@
 import React from 'react';
+import { Platform } from 'react-native';
 import { getAuthToken, setAuthToken, clearAuthToken } from '../lib/auth';
 import { api } from '../lib/api';
+
+const isWeb = Platform.OS === 'web';
+
+// Stub patient profile — Abebe Metaferia Alemey @ Zelalem Hospital (API unreachable due to CORS)
+const WEB_DEV_PROFILE = {
+  id: 'demo-patient-abebe-001',
+  role: 'patient',
+  full_name: 'Abebe Metaferia Alemey',
+  first_name: 'Abebe',
+  last_name: 'Alemey',
+  email: 'abebe.metaferia@linkhc.org',
+  phone: '+251911000001',
+  facility_id: 'demo-facility-zelalem-001',
+  facility_name: 'Zelalem Hospital',
+};
 
 const AuthContext = React.createContext(null);
 
@@ -19,6 +35,12 @@ export const AuthProvider = ({ children }) => {
         if (!stored || !active) return;
 
         setToken(stored);
+
+        // On web, skip API call (CORS blocks it) — use stub profile
+        if (isWeb) {
+          if (active) setUser(WEB_DEV_PROFILE);
+          return;
+        }
 
         // Fetch profile to get role (best-effort; keep token even if this fails)
         try {
@@ -50,6 +72,9 @@ export const AuthProvider = ({ children }) => {
     // Accept profile passed in (from LoginScreen) or fetch fresh
     if (profile) {
       setUser(profile);
+    } else if (isWeb) {
+      // On web, skip API call — use stub profile
+      setUser(WEB_DEV_PROFILE);
     } else {
       try {
         const fetched = await api.get('/auth/profile');
