@@ -10,6 +10,8 @@
 
 import { api } from '../lib/api';
 import { getQueue, removeFromQueue, incrementAttempts } from '../lib/offlineQueue';
+import { requestLinkAgentInteraction } from './linkAgentService';
+import { evaluateOfflineHewDangerAssessment } from './offlineCdssService';
 
 // ─── Patient search ─────────────────────────────────────────────────────────
 
@@ -128,4 +130,92 @@ export async function getPatientNotes(patientId, limit = 3) {
     `/hew/patients/${patientId}/notes?limit=${limit}`
   );
   return res?.notes ?? [];
+}
+
+const normalizeUrgency = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'emergency') return 'emergency';
+  if (normalized === 'urgent' || normalized === 'clinic_soon' || normalized === 'review') return 'urgent';
+  return 'routine';
+};
+
+const normalizeList = (value) => {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.map((item) => String(item || '').trim()).filter(Boolean))];
+};
+
+/**
+ * Run HEW danger-sign check with Link Agent first and offline CDSS fallback.
+ * Returns a normalized object that can be rendered consistently by HEW UI.
+ */
+export async function runHewDangerSignCheck({
+  protocolId,
+  answers = {},
+  noteText = '',
+  locale = 'am',
+} = {}) {
+  const offline = evaluateOfflineHewDangerAssessment({
+    protocolId,
+    answers,
+    noteText,
+    message: noteText,
+  });
+
+  try {
+    const response = await requestLinkAgentInteraction(
+      {
+        surface: 'hew',
+        intent: 'hew_guidance',
+        payload: {
+          protocolId,
+          answers,
+          noteText,
+          offlineFallback: offline,
+        },
+        conversation: [],
+        locale,
+        safeMode: true,
+      },
+      { includeAuth: true }
+    );
+
+    const agentStatus = String(response?.agent?.status || 'generated').toLowerCase();
+    const content = response?.content && typeof response.content === 'object'
+      ? response.content
+      : {};
+
+    const urgency = normalizeUrgency(content.urgency || offline.urgency);
+    const dangerSigns = normalizeList(content.dangerSigns || content.redFlags || offline.dangerSigns);
+    const nextSteps = normalizeList(content.nextSteps || content.guidance || offline.nextSteps);
+    const escalationPrompt = String(
+      content.escalationPrompt ||
+      content.message ||
+      offline.escalationPrompt
+    );
+
+    return {
+      ...offline,
+      urgency,
+      dangerSigns,
+      nextSteps: nextSteps.length > 0 ? nextSteps : offline.nextSteps,
+      escalationPrompt,
+      referralRecommendation: String(
+        content.referralRecommendation || offline.referralRecommendation
+      ),
+      requiresEmergency: urgency === 'emergency',
+      requiresReferral: urgency !== 'routine',
+      source: agentStatus === 'generated' ? 'link_agent_generated' : 'link_agent_fallback',
+      agentStatus,
+      agentMessage: String(response?.message || ''),
+      agentModel: String(response?.agent?.model || 'link_agent_v1'),
+    };
+  } catch (_error) {
+    return {
+      ...offline,
+      source: 'offline_fallback',
+      agentStatus: 'fallback',
+      agentMessage: 'Link Agent unavailable. Using offline danger-sign rules.',
+      agentModel: 'offline_cdss',
+    };
+  }
 }

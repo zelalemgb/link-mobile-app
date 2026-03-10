@@ -70,6 +70,7 @@ const DANGER_SIGN_TO_CHIP = {
   unconscious:       'Loss of consciousness',
   chest_pain:        'Chest pain',
   rash:              'Rash',
+  danger_sign:       'Fever',
 };
 
 // ---------------------------------------------------------------------------

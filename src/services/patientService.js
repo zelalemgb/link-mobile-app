@@ -40,6 +40,19 @@ export const getVisitHistory = async (limit = 10) => {
 };
 
 /**
+ * Fetch synced health records derived from real Link visits
+ */
+export const getSyncedRecords = async (limit = 80) => {
+    try {
+        const response = await api.get(`/mobile/patient/records?limit=${limit}`);
+        return response;
+    } catch (error) {
+        console.error("Failed to fetch synced records:", error);
+        throw error;
+    }
+};
+
+/**
  * Fetch complete visit details
  */
 export const getVisitDetails = async (visitId) => {
@@ -64,6 +77,25 @@ export const getFacilities = async () => {
     }
 };
 
+export const getPublicDirectoryFacilities = async (options = {}) => {
+    try {
+        const params = [];
+        if (options.search) params.push(`search=${encodeURIComponent(options.search)}`);
+        if (options.type && options.type !== "all") params.push(`type=${encodeURIComponent(options.type)}`);
+        if (options.limit) params.push(`limit=${encodeURIComponent(options.limit)}`);
+
+        const path = params.length
+            ? `/facilities/public?${params.join("&")}`
+            : "/facilities/public";
+
+        const response = await api.get(path, { auth: false });
+        return response;
+    } catch (error) {
+        console.error("Failed to fetch public facilities:", error);
+        throw error;
+    }
+};
+
 export const getAppointments = async () => {
     try {
         const response = await api.get("/patient-portal/appointments");
@@ -80,6 +112,16 @@ export const createAppointment = async (data) => {
         return response;
     } catch (error) {
         console.error("Failed to create appointment:", error);
+        throw error;
+    }
+};
+
+export const logSymptomCheck = async (data) => {
+    try {
+        const response = await api.post("/patient-portal/symptoms", data);
+        return response;
+    } catch (error) {
+        console.error("Failed to log symptom check:", error);
         throw error;
     }
 };

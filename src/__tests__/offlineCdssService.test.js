@@ -1,6 +1,8 @@
 import {
   cdssEngineVersion,
   evaluateOfflineCdss,
+  evaluateOfflineHewDangerAssessment,
+  evaluateOfflineSymptomGuidance,
   summarizeCdssDecisions,
   top20StgProtocolMatrix,
 } from "../services/offlineCdssService";
@@ -170,5 +172,56 @@ describe("offlineCdssService", () => {
     const summary = summarizeCdssDecisions({ alerts, decisions });
     expect(summary).toContain("CDS-GEN-001 [accepted]");
     expect(summary).toContain("confidence 96%");
+  });
+
+  it("returns emergency symptom guidance when danger signs are detected in text", () => {
+    const guidance = evaluateOfflineSymptomGuidance({
+      message: "I have chest pain and difficulty breathing since morning",
+    });
+
+    expect(guidance.urgency).toBe("emergency");
+    expect(guidance.requiresClinicReview).toBe(true);
+    expect(guidance.redFlags.length).toBeGreaterThan(0);
+    expect(guidance.nextSteps.join(" ")).toContain("immediate");
+  });
+
+  it("returns self-care guidance when no danger pattern is detected", () => {
+    const guidance = evaluateOfflineSymptomGuidance({
+      message: "I have mild cough and runny nose",
+    });
+
+    expect(guidance.urgency).toBe("self_care");
+    expect(guidance.requiresClinicReview).toBe(false);
+    expect(guidance.nextSteps.join(" ")).toContain("Monitor symptoms closely");
+  });
+
+  it("evaluates HEW maternal danger answers as emergency referral", () => {
+    const result = evaluateOfflineHewDangerAssessment({
+      protocolId: "maternal_followup",
+      answers: {
+        bleeding_now: true,
+        severe_headache_or_blur: true,
+      },
+      noteText: "Postpartum bleeding and severe headache",
+    });
+
+    expect(result.urgency).toBe("emergency");
+    expect(result.requiresEmergency).toBe(true);
+    expect(result.requiresReferral).toBe(true);
+    expect(result.dangerSigns.join(" ")).toContain("Maternal bleeding");
+  });
+
+  it("returns routine HEW guidance when danger answers are absent", () => {
+    const result = evaluateOfflineHewDangerAssessment({
+      protocolId: "adherence_followup",
+      answers: {
+        adherence_improving: true,
+      },
+      noteText: "Patient reports improved adherence this week",
+    });
+
+    expect(result.urgency).toBe("routine");
+    expect(result.requiresEmergency).toBe(false);
+    expect(result.requiresReferral).toBe(false);
   });
 });

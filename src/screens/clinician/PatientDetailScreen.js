@@ -117,6 +117,7 @@ function CommunityNotesSection({ notes }) {
         const dangerSigns = Object.entries(note.danger_signs ?? {})
           .filter(([, v]) => v)
           .map(([k]) => k.replace(/_/g, ' '));
+        const referralSummary = note.referral_summary ?? null;
         return (
           <View key={note.id} style={styles.noteRow}>
             <View style={styles.noteLeft}>
@@ -135,6 +136,20 @@ function CommunityNotesSection({ notes }) {
               ) : null}
               {note.follow_up_due ? (
                 <Text style={styles.followUpText}>Follow-up due: {note.follow_up_due?.slice(0, 10)}</Text>
+              ) : null}
+              {referralSummary ? (
+                <View style={styles.referralSummaryCard}>
+                  <Text style={styles.referralSummaryTitle}>
+                    Referral handoff
+                    {referralSummary.urgency ? ` · ${String(referralSummary.urgency).toUpperCase()}` : ''}
+                  </Text>
+                  {referralSummary.reason ? (
+                    <Text style={styles.referralSummaryText}>Reason: {referralSummary.reason}</Text>
+                  ) : null}
+                  {referralSummary.recommendation ? (
+                    <Text style={styles.referralSummaryText}>{referralSummary.recommendation}</Text>
+                  ) : null}
+                </View>
               ) : null}
             </View>
           </View>
@@ -192,6 +207,10 @@ export default function PatientDetailScreen({ route, navigation }) {
   };
 
   const isNurse = user?.role === 'nurse';
+  const isSoloProviderWorkspace =
+    (user?.workspace?.workspaceType === 'provider' || user?.workspace_type === 'provider') &&
+    ((user?.workspace?.teamMode || user?.team_mode) === 'solo' ||
+      (user?.workspace?.teamMode || user?.team_mode) == null);
 
   if (loading) {
     return <View style={styles.centered}><ActivityIndicator size="large" color={TEAL} /></View>;
@@ -276,7 +295,12 @@ export default function PatientDetailScreen({ route, navigation }) {
 
       {/* Footer CTAs — role-aware triage + consult */}
       <View style={styles.footer}>
-        {isNurse ? (
+        {isSoloProviderWorkspace ? (
+          <TouchableOpacity style={styles.consultBtn} onPress={handleStartConsult} activeOpacity={0.85}>
+            <Feather name="activity" size={18} color="#fff" />
+            <Text style={styles.consultBtnText}>Start consultation</Text>
+          </TouchableOpacity>
+        ) : isNurse ? (
           <>
             <TouchableOpacity style={styles.consultBtn} onPress={handleRecordTriage} activeOpacity={0.85}>
               <Feather name="clipboard" size={18} color="#fff" />
@@ -363,6 +387,9 @@ const styles = StyleSheet.create({
   dangerRow:        { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   dangerText:       { fontSize: 11, color: '#b91c1c', textTransform: 'capitalize', flex: 1 },
   followUpText:     { fontSize: 11, color: AMBER, marginTop: 4 },
+  referralSummaryCard: { marginTop: 8, borderWidth: 1, borderColor: '#bfdbfe', backgroundColor: '#eff6ff', borderRadius: 8, padding: 8, gap: 3 },
+  referralSummaryTitle: { fontSize: 11, color: '#1d4ed8', fontWeight: '700' },
+  referralSummaryText: { fontSize: 11, color: colors.ink, lineHeight: 16 },
 
   // Footer CTAs
   footer:                 { padding: 16, gap: 10, backgroundColor: colors.background, borderTopWidth: 1, borderTopColor: colors.border },

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -33,7 +33,7 @@ const TIME_SLOTS = [
   { value: "evening", label: "Evening (5PM - 8PM)" },
 ];
 
-const PatientAppointmentsScreen = () => {
+const PatientAppointmentsScreen = ({ route, navigation }) => {
   const [appointments, setAppointments] = useState([]);
   const [facilities, setFacilities] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -48,6 +48,11 @@ const PatientAppointmentsScreen = () => {
   const [timeSlot, setTimeSlot] = useState("");
   const [reason, setReason] = useState("");
   const [showFacilityPicker, setShowFacilityPicker] = useState(false);
+  const consumedPrefillRef = useRef(null);
+
+  const prefillFacilityId = route?.params?.prefillFacilityId || "";
+  const prefillFacilityName = route?.params?.prefillFacilityName || "";
+  const startBooking = Boolean(route?.params?.startBooking);
 
   const fetchData = useCallback(async () => {
     try {
@@ -68,6 +73,29 @@ const PatientAppointmentsScreen = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    if (!startBooking || !prefillFacilityId) return;
+
+    const hasFacility = facilities.some((facility) => facility.id === prefillFacilityId);
+    if (!hasFacility) return;
+
+    const prefillKey = `${prefillFacilityId}:booking`;
+    if (consumedPrefillRef.current === prefillKey) return;
+    consumedPrefillRef.current = prefillKey;
+
+    setSelectedFacility(prefillFacilityId);
+    setShowModal(true);
+    setShowFacilityPicker(false);
+
+    if (navigation?.setParams) {
+      navigation.setParams({
+        startBooking: undefined,
+        prefillFacilityId: undefined,
+        prefillFacilityName: undefined,
+      });
+    }
+  }, [facilities, navigation, prefillFacilityId, startBooking]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -110,7 +138,10 @@ const PatientAppointmentsScreen = () => {
     if (phone) Linking.openURL(`tel:${phone}`);
   };
 
-  const selectedFacilityName = facilities.find((f) => f.id === selectedFacility)?.name || "Select facility";
+  const selectedFacilityName =
+    facilities.find((f) => f.id === selectedFacility)?.name ||
+    (selectedFacility === prefillFacilityId ? prefillFacilityName : "") ||
+    "Select facility";
 
   if (loading) {
     return (

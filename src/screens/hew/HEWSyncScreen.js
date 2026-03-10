@@ -50,6 +50,8 @@ function noteTypeLabel(value) {
 
 function QueueItem({ item }) {
   const hasAudio = Boolean(item.audioUri);
+  const protocolTitle = item.payload?.guided_protocol?.title;
+  const referralUrgency = item.payload?.referral_summary?.urgency;
   return (
     <View style={styles.item}>
       <View style={styles.itemIcon}>
@@ -68,6 +70,12 @@ function QueueItem({ item }) {
           Queued {formatRelative(item.queuedAt)}
           {item.attempts > 0 ? `  ·  ${item.attempts} attempt${item.attempts > 1 ? 's' : ''}` : ''}
         </Text>
+        {protocolTitle ? (
+          <Text style={styles.itemProtocol}>Guided: {protocolTitle}</Text>
+        ) : null}
+        {referralUrgency ? (
+          <Text style={styles.itemReferral}>Referral urgency: {String(referralUrgency).toUpperCase()}</Text>
+        ) : null}
         {item.payload?.note_text && item.payload.note_text !== '(voice note)' && (
           <Text style={styles.itemPreview} numberOfLines={1}>
             {item.payload.note_text}
@@ -254,6 +262,8 @@ const styles = StyleSheet.create({
   itemBody:        { flex: 1, gap: 2 },
   itemType:        { fontSize: 13, fontWeight: '600', color: tokens.colors.ink, textTransform: 'capitalize' },
   itemMeta:        { fontSize: 11, color: tokens.colors.muted },
+  itemProtocol:    { fontSize: 11, color: '#0f766e', fontWeight: '600' },
+  itemReferral:    { fontSize: 11, color: '#b91c1c', fontWeight: '600' },
   itemPreview:     { fontSize: 12, color: tokens.colors.muted, fontStyle: 'italic' },
   itemWarn:        { marginTop: 2 },
 

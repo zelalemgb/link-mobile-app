@@ -153,6 +153,229 @@ const buildTop20ProtocolAlerts = (diagnosisCodeSet) => {
   return alerts;
 };
 
+const SYMPTOM_DANGER_RULES = Object.freeze([
+  {
+    id: "respiratory-danger",
+    label: "Breathing difficulty or severe chest symptoms",
+    urgency: "emergency",
+    terms: [
+      "difficulty breathing",
+      "shortness of breath",
+      "unable to breathe",
+      "cannot breathe",
+      "chest pain",
+      "chest tightness",
+      "wheezing severe",
+    ],
+    action: "Seek emergency care now at the nearest Link-affiliated clinic or hospital.",
+  },
+  {
+    id: "neurologic-danger",
+    label: "Confusion, seizure, or loss of consciousness",
+    urgency: "emergency",
+    terms: [
+      "confusion",
+      "disoriented",
+      "seizure",
+      "convulsion",
+      "fainting",
+      "unconscious",
+    ],
+    action: "Do not wait at home. Arrange immediate emergency transfer.",
+  },
+  {
+    id: "bleeding-danger",
+    label: "Heavy bleeding",
+    urgency: "emergency",
+    terms: [
+      "heavy bleeding",
+      "bleeding heavily",
+      "vomiting blood",
+      "blood in stool",
+      "bleeding in pregnancy",
+      "postpartum bleeding",
+    ],
+    action: "Treat as urgent emergency and seek immediate in-person care.",
+  },
+  {
+    id: "persistent-fever",
+    label: "Persistent fever or suspected infection",
+    urgency: "clinic_soon",
+    terms: [
+      "high fever",
+      "persistent fever",
+      "fever for",
+      "chills",
+      "rigor",
+      "possible infection",
+    ],
+    action: "Book clinic review soon for vitals check and focused examination.",
+  },
+  {
+    id: "dehydration-pattern",
+    label: "Possible dehydration pattern",
+    urgency: "clinic_soon",
+    terms: [
+      "unable to drink",
+      "very thirsty",
+      "dry mouth",
+      "sunken eyes",
+      "repeated vomiting",
+      "watery diarrhea",
+      "watery diarrhoea",
+    ],
+    action: "Increase fluids now and seek same-day clinic assessment if symptoms persist.",
+  },
+]);
+
+const dedupeTextList = (items = []) =>
+  [...new Set(items.map((item) => String(item || "").trim()).filter(Boolean))];
+
+const isEmergencyUrgency = (value) => value === "emergency";
+
+const HEW_PROTOCOL_DANGER_CATALOG = Object.freeze({
+  fever: [
+    {
+      id: "stiff_neck_or_convulsion",
+      label: "Stiff neck or convulsion",
+      urgency: "emergency",
+      action: "Treat as emergency danger pattern and arrange immediate transfer.",
+    },
+    {
+      id: "very_sleepy_or_unconscious",
+      label: "Very sleepy or unconscious",
+      urgency: "emergency",
+      action: "Protect airway and transfer urgently to the nearest capable facility.",
+    },
+    {
+      id: "cannot_drink_or_vomit_everything",
+      label: "Unable to drink or persistent vomiting",
+      urgency: "urgent",
+      action: "Escalate for dehydration/infection review at facility level today.",
+    },
+    {
+      id: "fever_very_high",
+      label: "Very high fever with chills",
+      urgency: "urgent",
+      action: "Same-day facility review for focused infection management.",
+    },
+  ],
+  respiratory: [
+    {
+      id: "chest_indrawing",
+      label: "Chest indrawing",
+      urgency: "emergency",
+      action: "Escalate immediately for severe respiratory compromise.",
+    },
+    {
+      id: "blue_lips_or_cannot_speak",
+      label: "Blue lips or cannot speak",
+      urgency: "emergency",
+      action: "Arrange emergency transfer with airway/oxygen prioritization.",
+    },
+    {
+      id: "fast_breathing",
+      label: "Fast breathing",
+      urgency: "urgent",
+      action: "Refer for same-day respiratory assessment.",
+    },
+    {
+      id: "chest_pain",
+      label: "Chest pain with respiratory symptoms",
+      urgency: "urgent",
+      action: "Escalate to facility for immediate clinical review.",
+    },
+  ],
+  maternal_followup: [
+    {
+      id: "bleeding_now",
+      label: "Maternal bleeding",
+      urgency: "emergency",
+      action: "Treat as obstetric emergency and transfer immediately.",
+    },
+    {
+      id: "severe_headache_or_blur",
+      label: "Severe headache or blurred vision",
+      urgency: "emergency",
+      action: "Escalate as hypertensive maternal danger pattern.",
+    },
+    {
+      id: "fever_after_delivery",
+      label: "Fever after delivery",
+      urgency: "urgent",
+      action: "Same-day maternal sepsis-focused review is required.",
+    },
+    {
+      id: "reduced_fetal_movement",
+      label: "Reduced fetal movement",
+      urgency: "urgent",
+      action: "Refer for urgent fetal and maternal assessment.",
+    },
+  ],
+  child_danger_signs: [
+    {
+      id: "convulsion",
+      label: "Child convulsion",
+      urgency: "emergency",
+      action: "Stabilize and transfer immediately for pediatric emergency care.",
+    },
+    {
+      id: "lethargic_or_unconscious",
+      label: "Child lethargic or unconscious",
+      urgency: "emergency",
+      action: "Treat as emergency and arrange urgent transport.",
+    },
+    {
+      id: "unable_to_feed",
+      label: "Child unable to feed/drink",
+      urgency: "urgent",
+      action: "Same-day escalation for dehydration/sepsis danger screening.",
+    },
+    {
+      id: "fast_breathing_or_indrawing",
+      label: "Child fast breathing or chest indrawing",
+      urgency: "emergency",
+      action: "Escalate urgently for severe pneumonia danger.",
+    },
+  ],
+  adherence_followup: [
+    {
+      id: "stopped_treatment",
+      label: "Stopped treatment completely",
+      urgency: "urgent",
+      action: "Escalate for clinician adherence rescue plan and refill.",
+    },
+    {
+      id: "symptoms_worsening",
+      label: "Symptoms worsening",
+      urgency: "urgent",
+      action: "Refer for same-day review to prevent deterioration.",
+    },
+  ],
+  referral_followup: [
+    {
+      id: "new_bleeding_or_breathing_issue",
+      label: "New bleeding or breathing issue after referral",
+      urgency: "emergency",
+      action: "Escalate immediately to receiving emergency-capable facility.",
+    },
+    {
+      id: "symptoms_worse_after_referral",
+      label: "Symptoms worsened after referral",
+      urgency: "urgent",
+      action: "Initiate repeat referral with high-priority handoff.",
+    },
+    {
+      id: "needs_repeat_referral",
+      label: "Needs repeat referral today",
+      urgency: "urgent",
+      action: "Prepare referral summary and activate transport support now.",
+    },
+  ],
+});
+
+const isAffirmativeAnswer = (value) => value === true || value === "yes" || value === 1;
+
 export const evaluateOfflineCdss = ({ draft } = {}) => {
   const safeDraft = draft && typeof draft === "object" ? draft : {};
   const vitals = safeDraft.vitals || {};
@@ -518,6 +741,131 @@ export const evaluateOfflineCdss = ({ draft } = {}) => {
     engineVersion: ENGINE_VERSION,
     generatedAt: new Date().toISOString(),
     alerts,
+  };
+};
+
+export const evaluateOfflineSymptomGuidance = ({ message = "", conversation = [] } = {}) => {
+  const conversationText = Array.isArray(conversation)
+    ? conversation
+        .map((turn) => turn?.message || turn?.text || "")
+        .join(" ")
+    : "";
+  const textBlob = normalizeText(message, conversationText);
+
+  const matchedRules = SYMPTOM_DANGER_RULES.filter((rule) =>
+    containsAny(textBlob, rule.terms)
+  );
+  const hasEmergency = matchedRules.some((rule) => isEmergencyUrgency(rule.urgency));
+
+  const urgency = hasEmergency
+    ? "emergency"
+    : matchedRules.length > 0
+      ? "clinic_soon"
+      : "self_care";
+
+  const redFlags = dedupeTextList(matchedRules.map((rule) => rule.label));
+  const nextSteps = dedupeTextList([
+    ...matchedRules.map((rule) => rule.action),
+    urgency === "self_care"
+      ? "Monitor symptoms closely and continue hydration, rest, and basic supportive care."
+      : "Share this symptom summary at the clinic for faster triage.",
+    "If symptoms worsen, escalate care immediately.",
+  ]);
+
+  const safetyNotes = dedupeTextList([
+    "This guidance is supportive and does not replace clinician assessment.",
+    hasEmergency
+      ? "Emergency danger signs detected from symptom text."
+      : "If danger signs appear later, seek urgent care immediately.",
+  ]);
+
+  const referralRecommendation = hasEmergency
+    ? "Immediate emergency referral advised."
+    : urgency === "clinic_soon"
+      ? "Same-day clinic review recommended."
+      : "Home monitoring is reasonable if symptoms remain mild.";
+
+  return {
+    engineVersion: ENGINE_VERSION,
+    mode: "offline_symptom_guidance_v1",
+    generatedAt: new Date().toISOString(),
+    urgency,
+    redFlags,
+    nextSteps,
+    safetyNotes,
+    referralRecommendation,
+    requiresClinicReview: urgency !== "self_care",
+  };
+};
+
+export const evaluateOfflineHewDangerAssessment = ({
+  protocolId = "",
+  answers = {},
+  message = "",
+  noteText = "",
+} = {}) => {
+  const protocolKey = String(protocolId || "").trim().toLowerCase();
+  const catalog = HEW_PROTOCOL_DANGER_CATALOG[protocolKey] || [];
+
+  const matchedProtocolDangers = catalog.filter((rule) =>
+    isAffirmativeAnswer(answers?.[rule.id])
+  );
+
+  const positiveAnswerText = Object.entries(answers || {})
+    .filter(([, value]) => isAffirmativeAnswer(value))
+    .map(([key]) => key.replace(/_/g, " "));
+
+  const narrative = dedupeTextList([message, noteText, ...positiveAnswerText]).join(" ");
+  const symptomGuidance = evaluateOfflineSymptomGuidance({ message: narrative });
+
+  const protocolEmergency = matchedProtocolDangers.some((rule) =>
+    isEmergencyUrgency(rule.urgency)
+  );
+  const symptomEmergency = isEmergencyUrgency(symptomGuidance.urgency);
+
+  const urgency = protocolEmergency || symptomEmergency
+    ? "emergency"
+    : matchedProtocolDangers.length > 0 || symptomGuidance.urgency === "clinic_soon"
+      ? "urgent"
+      : "routine";
+
+  const dangerSigns = dedupeTextList([
+    ...matchedProtocolDangers.map((rule) => rule.label),
+    ...(symptomGuidance.redFlags || []),
+  ]);
+
+  const nextSteps = dedupeTextList([
+    ...matchedProtocolDangers.map((rule) => rule.action),
+    ...(symptomGuidance.nextSteps || []),
+    urgency === "routine"
+      ? "Continue protocol follow-up and reinforce return precautions."
+      : "Document escalation reason and communicate referral urgency clearly.",
+  ]);
+
+  const escalationPrompt = urgency === "emergency"
+    ? "Emergency danger signs detected. Arrange immediate transfer."
+    : urgency === "urgent"
+      ? "Urgent danger indicators detected. Same-day escalation is advised."
+      : "No immediate danger sign detected from current answers.";
+
+  return {
+    engineVersion: ENGINE_VERSION,
+    mode: "offline_hew_danger_check_v1",
+    generatedAt: new Date().toISOString(),
+    protocolId: protocolKey || null,
+    urgency,
+    dangerSigns,
+    nextSteps,
+    escalationPrompt,
+    referralRecommendation:
+      urgency === "emergency"
+        ? "Immediate emergency referral advised."
+        : urgency === "urgent"
+          ? "Same-day referral advised."
+          : "Routine follow-up is acceptable if the patient remains stable.",
+    requiresEmergency: urgency === "emergency",
+    requiresReferral: urgency !== "routine",
+    source: "offline_cdss",
   };
 };
 

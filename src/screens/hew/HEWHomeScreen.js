@@ -20,6 +20,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
 import { searchPatients, getCaseload, getPatientNotes, getFacilityPatients } from '../../services/hewService';
+import { useFeatureFlags } from '../../context/FeatureFlagsContext';
 import { tokens } from '../../theme/tokens';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -44,7 +45,7 @@ function formatDate(dateStr) {
 
 // ─── Patient card ──────────────────────────────────────────────────────────
 
-function PatientCard({ patient, onLogVisit }) {
+function PatientCard({ patient, onLogVisit, onGuidedVisit, showGuided }) {
   const [notes, setNotes] = useState([]);
   const [expanded, setExpanded] = useState(false);
 
@@ -64,14 +65,26 @@ function PatientCard({ patient, onLogVisit }) {
             <Text style={styles.patientMeta}>DOB {patient.date_of_birth}</Text>
           ) : null}
         </View>
-        <TouchableOpacity
-          style={styles.logBtn}
-          onPress={() => onLogVisit(patient)}
-          accessibilityLabel="Log visit"
-        >
-          <Feather name="plus-circle" size={14} color="#fff" />
-          <Text style={styles.logBtnText}>Log visit</Text>
-        </TouchableOpacity>
+        <View style={styles.cardActions}>
+          {showGuided && (
+            <TouchableOpacity
+              style={styles.guidedBtn}
+              onPress={() => onGuidedVisit(patient)}
+              accessibilityLabel="Start guided assessment"
+            >
+              <Feather name="clipboard" size={13} color="#0f766e" />
+              <Text style={styles.guidedBtnText}>Guided</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={styles.logBtn}
+            onPress={() => onLogVisit(patient)}
+            accessibilityLabel="Log visit"
+          >
+            <Feather name="plus-circle" size={14} color="#fff" />
+            <Text style={styles.logBtnText}>Log visit</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {notes.length > 0 && (
@@ -105,7 +118,7 @@ function PatientCard({ patient, onLogVisit }) {
 
 // ─── Caseload item ────────────────────────────────────────────────────────
 
-function CaseloadItem({ patient, onLogVisit }) {
+function CaseloadItem({ patient, onLogVisit, onGuidedVisit, showGuided }) {
   const today = new Date().toISOString().slice(0, 10);
   const isOverdue = patient.follow_up_due && patient.follow_up_due < today;
 
@@ -124,14 +137,26 @@ function CaseloadItem({ patient, onLogVisit }) {
             </View>
           ) : null}
         </View>
-        <TouchableOpacity
-          style={styles.logBtn}
-          onPress={() => onLogVisit(patient)}
-          accessibilityLabel="Log visit"
-        >
-          <Feather name="plus-circle" size={14} color="#fff" />
-          <Text style={styles.logBtnText}>Log</Text>
-        </TouchableOpacity>
+        <View style={styles.cardActions}>
+          {showGuided && (
+            <TouchableOpacity
+              style={styles.guidedBtn}
+              onPress={() => onGuidedVisit(patient)}
+              accessibilityLabel="Start guided assessment"
+            >
+              <Feather name="clipboard" size={13} color="#0f766e" />
+              <Text style={styles.guidedBtnText}>Guided</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={styles.logBtn}
+            onPress={() => onLogVisit(patient)}
+            accessibilityLabel="Log visit"
+          >
+            <Feather name="plus-circle" size={14} color="#fff" />
+            <Text style={styles.logBtnText}>Log</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -140,6 +165,8 @@ function CaseloadItem({ patient, onLogVisit }) {
 // ─── Main screen ──────────────────────────────────────────────────────────
 
 export default function HEWHomeScreen({ navigation }) {
+  const { hewGuidedAssessments, linkAgentMvp } = useFeatureFlags();
+  const showGuidedFlow = hewGuidedAssessments || linkAgentMvp;
   const [tab, setTab] = useState('search');
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebounce(query);
@@ -205,9 +232,31 @@ export default function HEWHomeScreen({ navigation }) {
   }, [tab]);
 
   const goLog = (patient) => navigation.navigate('HEWRecordNote', { patient });
+  const goGuided = (patient) => navigation.navigate('HEWRecordNote', { patient, protocolId: 'fever' });
 
   return (
     <View style={styles.container}>
+      {(hewGuidedAssessments || linkAgentMvp) && (
+        <View style={styles.rolloutBanner}>
+          <Feather
+            name={linkAgentMvp ? 'shield' : 'clipboard'}
+            size={16}
+            color="#0f766e"
+            style={styles.rolloutBannerIcon}
+          />
+          <View style={styles.rolloutBannerBody}>
+            <Text style={styles.rolloutBannerTitle}>
+              {linkAgentMvp ? 'Link Agent guidance preview' : 'Guided assessment preview'}
+            </Text>
+            <Text style={styles.rolloutBannerText}>
+              {hewGuidedAssessments
+                ? 'Protocol-led question flows and danger-sign support are being rolled out without changing your current patient search and caseload tools.'
+                : 'Link Agent guidance is enabled for this environment. Existing HEW note and referral workflows remain unchanged.'}
+            </Text>
+          </View>
+        </View>
+      )}
+
       {/* Tabs */}
       <View style={styles.tabs}>
         {[['search', 'Patient search'], ['caseload', 'My caseload']].map(([key, label]) => (
@@ -259,6 +308,15 @@ export default function HEWHomeScreen({ navigation }) {
             <Text style={styles.noResults}>No patients found for "{debouncedQuery}"</Text>
           )}
 
+          {debouncedQuery.length < 2 && !loadingFacility && facilityPatients.length > 0 && showGuidedFlow && (
+            <View style={styles.guidedHint}>
+              <Feather name="shield" size={14} color="#0f766e" />
+              <Text style={styles.guidedHintText}>
+                Open any patient with <Text style={styles.guidedHintTextBold}>Guided</Text> to run fever, respiratory, maternal, child, adherence, or referral protocols.
+              </Text>
+            </View>
+          )}
+
           {debouncedQuery.length < 2 && !loadingFacility && facilityPatients.length > 0 && (
             <>
               <Text style={styles.sectionHeader}>
@@ -269,7 +327,12 @@ export default function HEWHomeScreen({ navigation }) {
                 keyExtractor={(p) => p.id}
                 contentContainerStyle={styles.listContent}
                 renderItem={({ item }) => (
-                  <PatientCard patient={item} onLogVisit={goLog} />
+                  <PatientCard
+                    patient={item}
+                    onLogVisit={goLog}
+                    onGuidedVisit={goGuided}
+                    showGuided={showGuidedFlow}
+                  />
                 )}
               />
             </>
@@ -281,7 +344,12 @@ export default function HEWHomeScreen({ navigation }) {
               keyExtractor={(p) => p.id}
               contentContainerStyle={styles.listContent}
               renderItem={({ item }) => (
-                <PatientCard patient={item} onLogVisit={goLog} />
+                <PatientCard
+                  patient={item}
+                  onLogVisit={goLog}
+                  onGuidedVisit={goGuided}
+                  showGuided={showGuidedFlow}
+                />
               )}
             />
           )}
@@ -310,7 +378,12 @@ export default function HEWHomeScreen({ navigation }) {
               <RefreshControl refreshing={refreshing} onRefresh={() => loadCaseload(true)} />
             }
             renderItem={({ item }) => (
-              <CaseloadItem patient={item} onLogVisit={goLog} />
+              <CaseloadItem
+                patient={item}
+                onLogVisit={goLog}
+                onGuidedVisit={goGuided}
+                showGuided={showGuidedFlow}
+              />
             )}
           />
         </View>
@@ -323,6 +396,22 @@ export default function HEWHomeScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container:       { flex: 1, backgroundColor: tokens.colors.background },
+  rolloutBanner:   {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    margin: 14,
+    marginBottom: 0,
+    padding: 12,
+    borderRadius: tokens.radii.md,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    backgroundColor: '#f0fdf4',
+  },
+  rolloutBannerIcon: { marginTop: 2 },
+  rolloutBannerBody: { flex: 1, gap: 2 },
+  rolloutBannerTitle: { fontSize: 13, fontWeight: '700', color: '#0f766e' },
+  rolloutBannerText: { fontSize: 12, lineHeight: 18, color: tokens.colors.ink },
 
   // Tabs
   tabs:            { flexDirection: 'row', backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: tokens.colors.border },
@@ -349,6 +438,7 @@ const styles = StyleSheet.create({
   card:            { backgroundColor: '#fff', borderRadius: tokens.radii.md, borderWidth: 1, borderColor: tokens.colors.border, overflow: 'hidden' },
   cardRow:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', padding: 14, gap: 10 },
   cardInfo:        { flex: 1, gap: 2 },
+  cardActions:     { alignItems: 'flex-end', gap: 6 },
   patientName:     { fontSize: 14, fontWeight: '600', color: tokens.colors.ink },
   patientMeta:     { fontSize: 12, color: tokens.colors.muted },
 
@@ -361,6 +451,11 @@ const styles = StyleSheet.create({
   // Log button
   logBtn:          { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#0f766e', paddingVertical: 7, paddingHorizontal: 12, borderRadius: tokens.radii.sm },
   logBtnText:      { color: '#fff', fontSize: 12, fontWeight: '600' },
+  guidedBtn:       { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#f0fdfa', borderColor: '#99f6e4', borderWidth: 1, paddingVertical: 6, paddingHorizontal: 10, borderRadius: tokens.radii.sm },
+  guidedBtnText:   { color: '#0f766e', fontSize: 12, fontWeight: '600' },
+  guidedHint:      { marginHorizontal: 14, marginBottom: 10, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: '#a7f3d0', backgroundColor: '#f0fdf4', flexDirection: 'row', alignItems: 'center', gap: 8 },
+  guidedHintText:  { flex: 1, fontSize: 12, color: '#0f766e', lineHeight: 18 },
+  guidedHintTextBold: { fontWeight: '700' },
 
   // Note preview
   notesToggle:     { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#f1f5f9' },

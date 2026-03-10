@@ -6,8 +6,8 @@ describe("Link mobile App", () => {
   it("shows the login screen when logged out", async () => {
     const { findByText, findByTestId } = render(<App />);
 
-    expect(await findByText("Welcome back")).toBeTruthy();
-    expect(await findByTestId("login-email")).toBeTruthy();
-    expect(await findByTestId("login-password")).toBeTruthy();
+    expect(await findByText("Patient Portal")).toBeTruthy();
+    expect(await findByText("Sign in with your phone number to access your Link records.")).toBeTruthy();
+    expect(await findByTestId("login-phone")).toBeTruthy();
   });
 });

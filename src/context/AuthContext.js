@@ -20,10 +20,85 @@ const WEB_DEV_PROFILE = {
 
 const AuthContext = React.createContext(null);
 
+const normalizeWorkspace = (workspace) => {
+  if (!workspace || typeof workspace !== 'object') return null;
+  return {
+    workspaceType: workspace.workspaceType || workspace.workspace_type || 'clinic',
+    setupMode: workspace.setupMode || workspace.setup_mode || 'legacy',
+    teamMode: workspace.teamMode || workspace.team_mode || 'legacy',
+    enabledModules: Array.isArray(workspace.enabledModules || workspace.enabled_modules)
+      ? (workspace.enabledModules || workspace.enabled_modules).filter((entry) => typeof entry === 'string')
+      : [],
+  };
+};
+
+const normalizeProfilePayload = (payload) => {
+  if (!payload || typeof payload !== 'object') return null;
+
+  const source = payload.user && typeof payload.user === 'object'
+    ? payload.user
+    : payload;
+  const role = source.role || source.user_role || payload.role || payload.user_role || null;
+  const workspace = normalizeWorkspace(source.workspace || payload.workspace);
+
+  return {
+    ...source,
+    role,
+    workspace,
+  };
+};
+
+const normalizePatientPayload = (payload) => {
+  if (!payload || typeof payload !== 'object') return null;
+
+  const patient = payload.patient && typeof payload.patient === 'object'
+    ? payload.patient
+    : payload;
+
+  if (!patient || typeof patient !== 'object' || !patient.id) return null;
+
+  const fallbackName = [patient.first_name, patient.last_name].filter(Boolean).join(' ').trim();
+  const fullName = patient.name || patient.full_name || fallbackName || 'Patient';
+  const nameParts = fullName.split(/\s+/).filter(Boolean);
+  const firstName = patient.first_name || nameParts[0] || 'Patient';
+  const lastName = patient.last_name || nameParts.slice(1).join(' ');
+
+  return {
+    ...patient,
+    role: 'patient',
+    full_name: fullName,
+    first_name: firstName,
+    last_name: lastName,
+    phone: patient.phone || patient.phone_number || null,
+  };
+};
+
+const resolveRole = (profile) => profile?.role || profile?.user_role || null;
+
 export const AuthProvider = ({ children }) => {
   const [token, setToken] = React.useState(null);
   const [user, setUser]   = React.useState(null);   // { id, role, full_name, … }
   const [loading, setLoading] = React.useState(true);
+
+  const fetchProfile = React.useCallback(async () => {
+    try {
+      const profileResponse = await api.get('/auth/profile');
+      const normalizedProfile = normalizeProfilePayload(profileResponse);
+      if (normalizedProfile) return normalizedProfile;
+    } catch {
+      // Fall through to patient profile lookup.
+    }
+
+    try {
+      const patientResponse = await api.get('/patient-auth/me');
+      const normalizedPatient = normalizePatientPayload(patientResponse);
+      if (normalizedPatient) return normalizedPatient;
+    } catch {
+      // Keep existing behavior: token can still be retained without profile payload.
+    }
+
+    return null;
+  }, []);
 
   // ── Bootstrap: restore token then fetch profile ──────────────────────
   React.useEffect(() => {
@@ -42,13 +117,8 @@ export const AuthProvider = ({ children }) => {
           return;
         }
 
-        // Fetch profile to get role (best-effort; keep token even if this fails)
-        try {
-          const profile = await api.get('/auth/profile');
-          if (active && profile) setUser(profile);
-        } catch {
-          // profile fetch failed — user stays null, role defaults to 'patient'
-        }
+        const profile = await fetchProfile();
+        if (active && profile) setUser(profile);
       } catch {
         // no stored token
       } finally {
@@ -58,7 +128,7 @@ export const AuthProvider = ({ children }) => {
 
     bootstrap();
     return () => { active = false; };
-  }, []);
+  }, [fetchProfile]);
 
   // ── Sign in ───────────────────────────────────────────────────────────
   const signInWithToken = async (nextToken, profile = null) => {
@@ -71,17 +141,17 @@ export const AuthProvider = ({ children }) => {
 
     // Accept profile passed in (from LoginScreen) or fetch fresh
     if (profile) {
-      setUser(profile);
+      setUser(
+        normalizeProfilePayload(profile) ||
+        normalizePatientPayload(profile) ||
+        profile
+      );
     } else if (isWeb) {
       // On web, skip API call — use stub profile
       setUser(WEB_DEV_PROFILE);
     } else {
-      try {
-        const fetched = await api.get('/auth/profile');
-        if (fetched) setUser(fetched);
-      } catch {
-        // leave user null; role will default to 'patient' in consumers
-      }
+      const fetched = await fetchProfile();
+      if (fetched) setUser(fetched);
     }
   };
 
@@ -92,7 +162,7 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
-  const role = user?.role ?? null;
+  const role = resolveRole(user);
 
   return (
     <AuthContext.Provider

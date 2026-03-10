@@ -13,6 +13,7 @@ import { getDb, newId, now } from '../lib/db/database';
 import { syncQueueRepo } from '../repositories/syncQueueRepo';
 import { patientRepo } from '../repositories/patientRepo';
 import { visitRepo } from '../repositories/visitRepo';
+import { flushOfflineQueue as flushHewOfflineQueue } from './hewService';
 
 const DEVICE_ID_STORAGE_KEY = 'linkhc_sync_device_id';
 const SCOPE_STORAGE_KEY = 'linkhc_sync_scope';
@@ -434,17 +435,32 @@ export const pullSyncDeltas = async ({
 
 const runSyncInternal = async ({
   includePull = true,
+  includeHewQueue = true,
   pushBatchSize = DEFAULT_PUSH_BATCH_SIZE,
   pushMaxBatches = DEFAULT_PUSH_MAX_BATCHES,
   pullLimit = DEFAULT_PULL_LIMIT,
   pullMaxPages = DEFAULT_PULL_MAX_PAGES,
 } = {}) => {
+  let hew = null;
+  if (includeHewQueue) {
+    try {
+      hew = await flushHewOfflineQueue();
+    } catch (error) {
+      hew = {
+        flushed: 0,
+        failed: 0,
+        error: String(error?.message || 'HEW queue flush failed'),
+      };
+    }
+  }
+
   const scope = await resolveSyncScope();
   if (!scope) {
     return {
       ok: false,
       error: 'SYNC_SCOPE_UNAVAILABLE',
       message: 'Could not determine facility/tenant sync scope.',
+      hew,
       push: null,
       pull: null,
     };
@@ -480,6 +496,7 @@ const runSyncInternal = async ({
     ok: true,
     at: now(),
     scope,
+    hew,
     push,
     pull,
   };

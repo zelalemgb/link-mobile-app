@@ -65,7 +65,9 @@ function BackBtn({ navigation, tintColor }) {
   );
 }
 
-export default function ClinicianNavigator() {
+export default function ClinicianNavigator({ shellMode = 'default' }) {
+  const isSoloProviderShell = shellMode === 'solo_provider';
+
   return (
     <Stack.Navigator
       initialRouteName="PatientList"
@@ -79,12 +81,16 @@ export default function ClinicianNavigator() {
           title: 'Patients',
           headerLeft: () => null,
           headerRight: () => (
-            <TouchableOpacity
-              onPress={() => navigation.navigate('SyncStatus')}
-              style={{ marginLeft: 8 }}
-            >
-              <Feather name="refresh-cw" size={20} color={TEAL} />
-            </TouchableOpacity>
+            isSoloProviderShell
+              ? null
+              : (
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('SyncStatus')}
+                  style={{ marginLeft: 8 }}
+                >
+                  <Feather name="refresh-cw" size={20} color={TEAL} />
+                </TouchableOpacity>
+              )
           ),
         })}
       />
@@ -120,14 +126,16 @@ export default function ClinicianNavigator() {
       />
 
       {/* ── Nurse triage (standalone vitals entry) ───────── */}
-      <Stack.Screen
-        name="NurseTriage"
-        component={NurseTriageScreen}
-        options={({ navigation }) => ({
-          title: 'Triage',
-          headerLeft: (props) => <BackBtn navigation={navigation} {...props} />,
-        })}
-      />
+      {!isSoloProviderShell && (
+        <Stack.Screen
+          name="NurseTriage"
+          component={NurseTriageScreen}
+          options={({ navigation }) => ({
+            title: 'Triage',
+            headerLeft: (props) => <BackBtn navigation={navigation} {...props} />,
+          })}
+        />
+      )}
 
       {/* ── Consult wizard (nested) ───────────────────────── */}
       <Stack.Screen

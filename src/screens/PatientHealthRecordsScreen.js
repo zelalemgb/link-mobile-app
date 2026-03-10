@@ -10,25 +10,28 @@ import {
   RefreshControl,
   ActivityIndicator,
   Linking,
+  Share,
   Alert,
 } from "react-native";
 import Screen from "../components/ui/Screen";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import { colors, spacing, radius, typography, shadow } from "../theme/tokens";
-import { getDocuments, uploadDocument, deleteDocument } from "../services/patientService";
+import { getDocuments, getSyncedRecords, uploadDocument, deleteDocument } from "../services/patientService";
 import { useToast } from "../context/ToastContext";
+import { useFeatureFlags } from "../context/FeatureFlagsContext";
 
 const DOC_TYPES = [
   { value: "prescription", label: "Prescription", bg: "#DBEAFE", text: "#1E40AF" },
   { value: "lab_result", label: "Lab Result", bg: "#D1FAE5", text: "#065F46" },
   { value: "imaging", label: "Imaging", bg: "#FEF3C7", text: "#92400E" },
   { value: "visit_summary", label: "Visit Summary", bg: "#E0E7FF", text: "#3730A3" },
+  { value: "referral_summary", label: "Referral Summary", bg: "#FEE2E2", text: "#991B1B" },
   { value: "vaccination", label: "Vaccination", bg: "#FCE7F3", text: "#9D174D" },
   { value: "other", label: "Other", bg: "#F3F4F6", text: "#6B7280" },
 ];
 
-const getDocTypeConfig = (type) => DOC_TYPES.find((d) => d.value === type) || DOC_TYPES[5];
+const getDocTypeConfig = (type) => DOC_TYPES.find((d) => d.value === type) || DOC_TYPES.find((d) => d.value === "other");
 
 const PatientHealthRecordsScreen = () => {
   const [documents, setDocuments] = useState([]);
@@ -39,7 +42,9 @@ const PatientHealthRecordsScreen = () => {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showFilterPicker, setShowFilterPicker] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [growthLinks, setGrowthLinks] = useState(null);
   const { showToast } = useToast();
+  const { patientRecordsSync, linkAgentMvp } = useFeatureFlags();
 
   // Upload form state
   const [uploadType, setUploadType] = useState("prescription");
@@ -51,8 +56,25 @@ const PatientHealthRecordsScreen = () => {
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await getDocuments();
-      setDocuments(res.documents || []);
+      const [docsResponse, syncedResponse] = await Promise.all([
+        getDocuments(),
+        getSyncedRecords(80).catch((error) => {
+          console.error("Failed to load synced records:", error);
+          return { records: [] };
+        }),
+      ]);
+
+      const synced = (syncedResponse.records || []).map((record) => ({
+        ...record,
+        synced: true,
+      }));
+      const manual = (docsResponse.documents || []).map((record) => ({
+        ...record,
+        synced: false,
+      }));
+
+      setDocuments([...synced, ...manual]);
+      setGrowthLinks(syncedResponse.growth || null);
     } catch (err) {
       console.error("Failed to load documents:", err);
     } finally {
@@ -104,6 +126,11 @@ const PatientHealthRecordsScreen = () => {
   };
 
   const handleDelete = (doc) => {
+    if (doc.synced) {
+      Alert.alert("Synced Record", "This record comes from a Link visit and cannot be deleted from the app.");
+      return;
+    }
+
     Alert.alert("Delete Document", `Are you sure you want to delete "${doc.description || doc.document_type}"?`, [
       { text: "Cancel", style: "cancel" },
       {
@@ -124,6 +151,27 @@ const PatientHealthRecordsScreen = () => {
 
   const handleDownload = (url) => {
     if (url) Linking.openURL(url);
+  };
+
+  const handleOpenExternal = async (url) => {
+    if (!url) return;
+    try {
+      await Linking.openURL(url);
+    } catch (error) {
+      Alert.alert("Unable to open link", "Please try again in a moment.");
+    }
+  };
+
+  const handleShareGrowthLink = async () => {
+    const message = growthLinks?.shareMessage || "Use Link Patient to keep your records connected.";
+    const url = growthLinks?.patientAppInstallUrl;
+    try {
+      await Share.share({
+        message: url ? `${message}\n${url}` : message,
+      });
+    } catch (error) {
+      Alert.alert("Unable to share", "Please try again in a moment.");
+    }
   };
 
   // Filter and search
@@ -161,7 +209,37 @@ const PatientHealthRecordsScreen = () => {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={palette.darkPurple} />}
       >
         <Text style={styles.heading}>Health Records</Text>
-        <Text style={styles.subtitle}>Your medical documents and records</Text>
+        <Text style={styles.subtitle}>Your synced visit records and uploaded documents</Text>
+        {patientRecordsSync && (
+          <View style={styles.rolloutCard}>
+            <Text style={styles.rolloutTitle}>
+              {linkAgentMvp ? "Link Agent + record sync active" : "Automatic record sync active"}
+            </Text>
+            <Text style={styles.rolloutBody}>
+              Visit summaries, prescriptions, lab results, and referral summaries from Link visits appear here
+              automatically. Manual uploads continue to work the same way.
+            </Text>
+          </View>
+        )}
+        {growthLinks && (
+          <View style={styles.growthCard}>
+            <Text style={styles.growthTitle}>Keep care connected after every visit</Text>
+            <Text style={styles.growthBody}>
+              Open affiliated clinic discovery, symptom guidance, or share the patient app link directly from here.
+            </Text>
+            <View style={styles.growthActions}>
+              <Pressable style={styles.growthActionBtn} onPress={() => handleOpenExternal(growthLinks.facilityFinderUrl)}>
+                <Text style={styles.growthActionText}>Find linked clinics</Text>
+              </Pressable>
+              <Pressable style={styles.growthActionBtn} onPress={() => handleOpenExternal(growthLinks.symptomCheckUrl)}>
+                <Text style={styles.growthActionText}>Symptom guidance</Text>
+              </Pressable>
+              <Pressable style={styles.growthActionBtn} onPress={handleShareGrowthLink}>
+                <Text style={styles.growthActionText}>Share app link</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
 
         {/* Search + Filter */}
         <View style={styles.searchRow}>
@@ -200,7 +278,9 @@ const PatientHealthRecordsScreen = () => {
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>No documents found</Text>
             <Text style={styles.emptyBody}>
-              {documents.length === 0 ? "Upload your first health record." : "Try adjusting your search or filter."}
+              {documents.length === 0
+                ? "Synced visit documents will appear here automatically. You can also upload your first health record manually."
+                : "Try adjusting your search or filter."}
             </Text>
           </View>
         ) : (
@@ -230,12 +310,27 @@ const PatientHealthRecordsScreen = () => {
                   </View>
                 )}
                 <View style={styles.cardActions}>
-                  <Pressable style={styles.actionBtn} onPress={() => handleDownload(doc.file_url)}>
-                    <Text style={styles.actionBtnText}>Download</Text>
-                  </Pressable>
-                  <Pressable style={[styles.actionBtn, styles.deleteBtn]} onPress={() => handleDelete(doc)}>
-                    <Text style={styles.deleteBtnText}>Delete</Text>
-                  </Pressable>
+                  {doc.file_url ? (
+                    <Pressable style={styles.actionBtn} onPress={() => handleDownload(doc.file_url)}>
+                      <Text style={styles.actionBtnText}>Download</Text>
+                    </Pressable>
+                  ) : null}
+                  {doc.synced ? (
+                    <View style={styles.syncedActions}>
+                      <View style={styles.syncedPill}>
+                        <Text style={styles.syncedPillText}>Synced from Link visit</Text>
+                      </View>
+                      {doc.continuity_url ? (
+                        <Pressable style={[styles.actionBtn, styles.continueBtn]} onPress={() => handleOpenExternal(doc.continuity_url)}>
+                          <Text style={styles.actionBtnText}>Continue care</Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  ) : (
+                    <Pressable style={[styles.actionBtn, styles.deleteBtn]} onPress={() => handleDelete(doc)}>
+                      <Text style={styles.deleteBtnText}>Delete</Text>
+                    </Pressable>
+                  )}
                 </View>
               </Card>
             );
@@ -347,6 +442,38 @@ const styles = StyleSheet.create({
   loadingText: { marginTop: spacing.md, fontSize: 14, color: palette.darkPurple },
   heading: { fontSize: 22, fontWeight: "700", color: palette.black, marginBottom: 4 },
   subtitle: { fontSize: 14, color: palette.black, opacity: 0.5, marginBottom: spacing.md },
+  rolloutCard: {
+    marginBottom: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: palette.lightPurple,
+    backgroundColor: "#F3EEFF",
+    ...shadow.card,
+  },
+  rolloutTitle: { fontSize: 14, fontWeight: "700", color: palette.darkPurple, marginBottom: 6 },
+  rolloutBody: { fontSize: 13, color: palette.black, opacity: 0.75, lineHeight: 18 },
+  growthCard: {
+    marginBottom: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: "#BFD8FF",
+    backgroundColor: "#F4F8FF",
+    ...shadow.card,
+  },
+  growthTitle: { fontSize: 14, fontWeight: "700", color: palette.darkPurple, marginBottom: 6 },
+  growthBody: { fontSize: 13, color: palette.black, opacity: 0.72, lineHeight: 18 },
+  growthActions: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: spacing.sm },
+  growthActionBtn: {
+    borderRadius: 10,
+    backgroundColor: palette.white,
+    borderWidth: 1,
+    borderColor: "#BFD8FF",
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  growthActionText: { fontSize: 12, fontWeight: "700", color: palette.darkPurple },
 
   searchRow: { marginBottom: spacing.sm },
   searchInput: {
@@ -400,6 +527,7 @@ const styles = StyleSheet.create({
   tagText: { fontSize: 11, color: palette.darkPurple },
 
   cardActions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
+  syncedActions: { flexDirection: "row", gap: spacing.sm, flexWrap: "wrap" },
   actionBtn: {
     paddingVertical: 6,
     paddingHorizontal: 14,
@@ -407,8 +535,18 @@ const styles = StyleSheet.create({
     backgroundColor: palette.lightPurple,
   },
   actionBtnText: { fontSize: 12, fontWeight: "700", color: palette.darkPurple },
+  continueBtn: { backgroundColor: "#DBEAFE" },
   deleteBtn: { backgroundColor: "#FEE2E2" },
   deleteBtnText: { fontSize: 12, fontWeight: "700", color: "#991B1B" },
+  syncedPill: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: "#E8F6EE",
+    borderWidth: 1,
+    borderColor: "#9BD4B3",
+  },
+  syncedPillText: { fontSize: 12, fontWeight: "700", color: "#0F5132" },
 
   fabContainer: { position: "absolute", bottom: spacing.lg, left: spacing.lg, right: spacing.lg },
   fab: {

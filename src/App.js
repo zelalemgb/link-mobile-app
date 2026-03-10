@@ -19,6 +19,7 @@ import { ToastProvider } from "./context/ToastContext";
 import { DatabaseProvider } from "./context/DatabaseContext";
 import { ConsultProvider } from "./context/ConsultContext";
 import { AppLockProvider, useAppLock } from "./context/AppLockContext";
+import { FeatureFlagsProvider, useFeatureFlags } from "./context/FeatureFlagsContext";
 import AppLockScreen from "./screens/AppLockScreen";
 import {
   registerBackgroundSyncAsync,
@@ -26,6 +27,7 @@ import {
 } from "./services/backgroundSyncService";
 
 const Stack = createNativeStackNavigator();
+const LoadingScreen = () => null;
 
 export default function App() {
   React.useEffect(() => {
@@ -37,11 +39,13 @@ export default function App() {
       <ErrorBoundary>
         <AuthProvider>
           <DatabaseProvider>
-            <AppLockProvider>
-              <ToastProvider>
-                <AppNavigator />
-              </ToastProvider>
-            </AppLockProvider>
+            <FeatureFlagsProvider>
+              <AppLockProvider>
+                <ToastProvider>
+                  <AppNavigator />
+                </ToastProvider>
+              </AppLockProvider>
+            </FeatureFlagsProvider>
           </DatabaseProvider>
         </AuthProvider>
       </ErrorBoundary>
@@ -50,12 +54,26 @@ export default function App() {
 }
 
 const AppNavigator = () => {
-  const { isAuthenticated, loading, role } = useAuth();
+  const { isAuthenticated, loading, role, user } = useAuth();
   const { isLocked, hasPinSet, loading: lockLoading } = useAppLock();
+  const { linkAgentMvp } = useFeatureFlags();
+
+  const workspaceType = user?.workspace?.workspaceType || user?.workspace_type || null;
+  const teamMode = user?.workspace?.teamMode || user?.team_mode || null;
+  const isSoloProviderWorkspace = workspaceType === "provider" && (teamMode === "solo" || teamMode == null);
 
   React.useEffect(() => {
-    console.log("AppNavigator State:", { isAuthenticated, loading, role, isLocked, hasPinSet });
-  }, [isAuthenticated, loading, role, isLocked, hasPinSet]);
+    console.log("AppNavigator State:", {
+      isAuthenticated,
+      loading,
+      role,
+      workspaceType,
+      teamMode,
+      isSoloProviderWorkspace,
+      isLocked,
+      hasPinSet,
+    });
+  }, [isAuthenticated, loading, role, workspaceType, teamMode, isSoloProviderWorkspace, isLocked, hasPinSet]);
 
   React.useEffect(() => {
     const configureBackgroundSync = async () => {
@@ -80,7 +98,7 @@ const AppNavigator = () => {
         <Stack.Navigator>
           <Stack.Screen
             name="Loading"
-            component={() => null}
+            component={LoadingScreen}
             options={{ headerShown: false }}
           />
         </Stack.Navigator>
@@ -118,12 +136,13 @@ const AppNavigator = () => {
   }
 
   // ── Clinician roles: nurse / doctor / admin / clinician ───────────────
-  const CLINICIAN_ROLES = ["nurse", "doctor", "admin", "clinician", "health_officer"];
-  if (role && CLINICIAN_ROLES.includes(role)) {
+  const CLINICIAN_ROLES = ["nurse", "doctor", "admin", "clinician", "health_officer", "clinical_officer"];
+  const isClinicianRole = Boolean(role && CLINICIAN_ROLES.includes(role));
+  if (isClinicianRole || isSoloProviderWorkspace) {
     return (
       <ConsultProvider>
         <NavigationContainer>
-          <ClinicianNavigator />
+          <ClinicianNavigator shellMode={isSoloProviderWorkspace ? "solo_provider" : "default"} />
         </NavigationContainer>
       </ConsultProvider>
     );
@@ -141,7 +160,7 @@ const AppNavigator = () => {
         <Stack.Screen
           name="SymptomCheckerConversational"
           component={SymptomCheckerConversationalScreen}
-          options={{ title: "ምልክት መለያ" }}
+          options={{ title: linkAgentMvp ? "Link Agent" : "ምልክት መለያ" }}
         />
         <Stack.Screen
           name="PatientAppointments"

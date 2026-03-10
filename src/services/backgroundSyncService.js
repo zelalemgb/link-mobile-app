@@ -18,16 +18,18 @@ if (TaskManager && !TaskManager.isTaskDefined(WAVE2_BACKGROUND_SYNC_TASK)) {
       console.log('[sync-bg] task-start');
       const result = await runSyncNow({
         includePull: true,
+        includeHewQueue: true,
         pushMaxBatches: 5,
         pullMaxPages: 2,
       });
 
+      const hewFlushed = result?.hew?.flushed ?? 0;
       const pushed = result?.push?.pushed ?? 0;
       const pulled = result?.pull?.pulledOps ?? 0;
       const tombstones = result?.pull?.appliedTombstones ?? 0;
-      const changed = pushed > 0 || pulled > 0 || tombstones > 0;
+      const changed = hewFlushed > 0 || pushed > 0 || pulled > 0 || tombstones > 0;
       console.log(
-        `[sync-bg] task-result pushed=${pushed} pulled=${pulled} tombstones=${tombstones} changed=${changed}`
+        `[sync-bg] task-result hewFlushed=${hewFlushed} pushed=${pushed} pulled=${pulled} tombstones=${tombstones} changed=${changed}`
       );
 
       return changed
