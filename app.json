@@ -1,10 +1,23 @@
 {
-    "expo": {
-        "name": "link-mobile-app",
-        "slug": "link-mobile-app",
-        "version": "1.0.0",
-        "assetBundlePatterns": [
-            "**/*"
-        ]
-    }
+  "expo": {
+    "name": "link-mobile-app",
+    "slug": "link-mobile-app",
+    "version": "1.0.0",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "plugins": [
+      "expo-secure-store",
+      "expo-background-fetch",
+      [
+        "expo-sqlite",
+        {
+          "enableFTS": true,
+          "useSQLCipher": true,
+          "android": { "enableFTS": true, "useSQLCipher": true },
+          "ios": { "enableFTS": true, "useSQLCipher": true }
+        }
+      ]
+    ]
+  }
 }

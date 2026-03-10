@@ -1,40 +1,60 @@
 import React from "react";
-import { SafeAreaView, View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
+import Screen from "../components/ui/Screen";
+import Card from "../components/ui/Card";
+import { colors, spacing, typography } from "../theme/tokens";
 
 const HealthFeedScreen = () => {
   return (
-    <SafeAreaView style={styles.container} testID="health-feed-screen">
-      <View style={styles.content}>
+    <Screen>
+      <View style={styles.header}>
         <Text style={styles.title}>Health Feed</Text>
         <Text style={styles.subtitle}>
-          Personalized tips and updates for your wellbeing.
+          Personalized guidance for your goals.
         </Text>
       </View>
-    </SafeAreaView>
+
+      <Card style={styles.card}>
+        <Text style={styles.cardLabel}>Today</Text>
+        <Text style={styles.cardTitle}>Hydration check</Text>
+        <Text style={styles.cardBody}>
+          Aim for 6–8 glasses of water. Consistent hydration keeps energy and
+          focus stable throughout the day.
+        </Text>
+      </Card>
+    </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fef3c7",
-  },
-  content: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
+  header: {
+    marginBottom: spacing.md,
   },
   title: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "700",
-    color: "#92400e",
-    marginBottom: 10,
+    color: colors.ink,
+    marginBottom: 4,
   },
   subtitle: {
-    fontSize: 14,
-    color: "#92400e",
-    textAlign: "center",
+    fontSize: 13,
+    color: colors.muted,
+  },
+  card: {
+    gap: spacing.xs,
+  },
+  cardLabel: {
+    ...typography.caption,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    color: colors.primary,
+  },
+  cardTitle: {
+    ...typography.h3,
+  },
+  cardBody: {
+    ...typography.body,
+    color: colors.text,
   },
 });
 

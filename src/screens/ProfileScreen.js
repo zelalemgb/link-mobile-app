@@ -1,40 +1,65 @@
 import React from "react";
-import { SafeAreaView, View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
+import Screen from "../components/ui/Screen";
+import Card from "../components/ui/Card";
+import Button from "../components/ui/Button";
+import { colors, spacing, typography } from "../theme/tokens";
+import { useAuth } from "../context/AuthContext";
+import { supabase } from "../lib/supabase";
 
 const ProfileScreen = () => {
+  const { signOut, user } = useAuth();
+  const displayName = user?.full_name || "Patient";
+  const facility = user?.facility_name || "Addis Ababa";
+
   return (
-    <SafeAreaView style={styles.container} testID="profile-screen">
-      <View style={styles.content}>
+    <Screen>
+      <View style={styles.header}>
         <Text style={styles.title}>My Profile</Text>
         <Text style={styles.subtitle}>
-          Keep your health preferences and contact details up to date.
+          Manage your health records and preferences.
         </Text>
       </View>
-    </SafeAreaView>
+
+      <Card style={styles.card}>
+        <Text style={styles.cardTitle}>Primary details</Text>
+        <Text style={styles.cardBody}>{displayName} · {facility}</Text>
+        <Button title="Update profile" onPress={() => { }} variant="secondary" />
+        <Button
+          title="Sign out"
+          onPress={async () => {
+            await supabase.auth.signOut();
+            await signOut();
+          }}
+          variant="ghost"
+        />
+      </Card>
+    </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#ecfdf3",
-  },
-  content: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
+  header: {
+    marginBottom: spacing.md,
   },
   title: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "700",
-    color: "#065f46",
-    marginBottom: 10,
+    color: colors.ink,
+    marginBottom: 4,
   },
   subtitle: {
-    fontSize: 14,
-    color: "#047857",
-    textAlign: "center",
+    fontSize: 13,
+    color: colors.muted,
+  },
+  card: {
+    gap: spacing.sm,
+  },
+  cardTitle: {
+    ...typography.h3,
+  },
+  cardBody: {
+    ...typography.body,
   },
 });
 
